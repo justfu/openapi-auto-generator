@@ -106,6 +106,23 @@ paths:
                 $ref: '#/components/schemas/UserProfile'
 ```
 
+### 鉴权方式
+
+所有需要鉴权的接口使用 Header 直接传递 `token` 参数：
+
+```yaml
+security:
+  - TokenAuth: []
+
+components:
+  securitySchemes:
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: token
+      description: 在请求头中直接传递 token 参数进行鉴权
+```
+
 ### POST 接口
 
 ```yaml

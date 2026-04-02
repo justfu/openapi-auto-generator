@@ -65,7 +65,7 @@ info:
   title: '接口标题'
   description: 接口描述
 security:              # 鉴权方案，放在根级别
-  - BearerAuth: []
+  - TokenAuth: []
 paths:
   /api/v1/...:
     parameters:         # 路径参数放在 path 级别，用 $ref 引用 components/schemas
@@ -100,7 +100,7 @@ info:
   description: 获取当前登录用户的基本信息、绑定状态以及自身的邀请码
 
 security:
-  - BearerAuth: []
+  - TokenAuth: []
 
 paths:
   /api/v1/user/{userId}/profile:
@@ -192,11 +192,11 @@ components:
           type: string
 
   securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: JWT Token鉴权，格式：Bearer {token}
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: token
+      description: 在请求头中直接传递 token 参数进行鉴权
 ```
 
 ### GET 接口示例（无路径参数）
@@ -209,7 +209,7 @@ info:
   description: 获取当前登录用户的基本信息、绑定状态以及自身的邀请码
 
 security:
-  - BearerAuth: []
+  - TokenAuth: []
 
 paths:
   /api/v1/user/profile:
@@ -268,11 +268,11 @@ components:
           type: string
 
   securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: JWT Token鉴权，格式：Bearer {token}
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: token
+      description: 在请求头中直接传递 token 参数进行鉴权
 ```
 
 ### POST 接口示例
@@ -285,7 +285,7 @@ info:
   description: 接收小程序端获取的手机号授权code，由后端向微信服务器换取真实手机号并更新至用户表
 
 security:
-  - BearerAuth: []
+  - TokenAuth: []
 
 paths:
   /api/v1/user/bind-phone:
@@ -355,11 +355,11 @@ components:
           type: string
 
   securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: JWT Token鉴权，格式：Bearer {token}
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: token
+      description: 在请求头中直接传递 token 参数进行鉴权
 ```
 
 ### 无需鉴权接口示例
