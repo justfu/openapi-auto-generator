@@ -442,16 +442,93 @@ components:
 
 ### 字段类型映射
 
+#### Go 类型映射
+
 | Go 类型 | OpenAPI 3.1 类型 |
 |---------|-------------------|
 | string | `type: string` |
 | int, int64 | `type: integer`, `format: int64` |
+| int32 | `type: integer`, `format: int32` |
 | uint32 | `type: integer`, `format: int32`, `minimum: 0` |
 | float64 | `type: number` |
+| float32 | `type: number`, `format: float` |
 | bool | `type: boolean` |
 | time.Time | `type: string`, `format: date-time` |
 | *T | `type: [T, 'null']` （数组类型表示可空） |
 | []T | `type: array`, `items: { type: T }` |
+| map[string]T | `type: object`, `additionalProperties: { type: T }` |
+| interface{} | `type: object` |
+
+#### Java 类型映射
+
+| Java 类型 | OpenAPI 3.1 类型 |
+|-----------|-------------------|
+| String | `type: string` |
+| int, Integer | `type: integer`, `format: int32` |
+| long, Long | `type: integer`, `format: int64` |
+| short, Short | `type: integer`, `format: int32` |
+| double, Double | `type: number`, `format: double` |
+| float, Float | `type: number`, `format: float` |
+| BigDecimal | `type: number` |
+| boolean, Boolean | `type: boolean` |
+| LocalDate | `type: string`, `format: date` |
+| LocalTime | `type: string`, `format: time` |
+| LocalDateTime | `type: string`, `format: date-time` |
+| Date | `type: string`, `format: date-time` |
+| OffsetDateTime | `type: string`, `format: date-time` |
+| ZonedDateTime | `type: string`, `format: date-time` |
+| UUID | `type: string`, `format: uuid` |
+| List\<T\> | `type: array`, `items: { type: T }` |
+| Set\<T\> | `type: array`, `items: { type: T }`, `uniqueItems: true` |
+| Map\<String, T\> | `type: object`, `additionalProperties: { type: T }` |
+| Object | `type: object` |
+| Optional\<T\> | `type: [T, 'null']` |
+| @Nullable T | `type: [T, 'null']` |
+| Enum | `type: string`, `enum: [value1, value2, ...]` |
+
+#### PHP 类型映射
+
+| PHP 类型 | OpenAPI 3.1 类型 |
+|----------|-------------------|
+| string | `type: string` |
+| int | `type: integer`, `format: int64` |
+| float | `type: number`, `format: double` |
+| bool | `type: boolean` |
+| array | `type: array`, `items: { type: T }` |
+| object | `type: object` |
+| null | `type: 'null'` |
+| mixed | 不映射，需根据上下文确定 |
+| DateTime | `type: string`, `format: date-time` |
+| DateTimeInterface | `type: string`, `format: date-time` |
+| Carbon | `type: string`, `format: date-time` |
+| ?T（可空类型） | `type: [T, 'null']` |
+| Collection | `type: array`, `items: { type: T }` |
+| enum | `type: string`, `enum: [value1, value2, ...]`（PHP 8.1+） |
+| backed enum (int) | `type: integer`, `enum: [1, 2, ...]` |
+
+#### Python 类型映射
+
+| Python 类型 | OpenAPI 3.1 类型 |
+|-------------|-------------------|
+| str | `type: string` |
+| int | `type: integer`, `format: int64` |
+| float | `type: number`, `format: double` |
+| bool | `type: boolean` |
+| bytes | `type: string`, `format: byte` |
+| decimal.Decimal | `type: number` |
+| datetime.date | `type: string`, `format: date` |
+| datetime.time | `type: string`, `format: time` |
+| datetime.datetime | `type: string`, `format: date-time` |
+| uuid.UUID | `type: string`, `format: uuid` |
+| list\[T\] | `type: array`, `items: { type: T }` |
+| tuple\[T, ...\] | `type: array`, `items: { type: T }` |
+| set\[T\] | `type: array`, `items: { type: T }`, `uniqueItems: true` |
+| dict\[str, T\] | `type: object`, `additionalProperties: { type: T }` |
+| Optional\[T\] | `type: [T, 'null']` |
+| T \| None | `type: [T, 'null']` |
+| Union\[T1, T2\] | `oneOf: [{ type: T1 }, { type: T2 }]` |
+| Literal\["a", "b"\] | `type: string`, `enum: ["a", "b"]` |
+| Enum | `type: string` 或 `type: integer`, `enum: [...]` |
 
 ### 可空类型说明（OpenAPI 3.1）
 

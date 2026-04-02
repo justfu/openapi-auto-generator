@@ -138,18 +138,75 @@ paths:
       summary: 微信登录
 ```
 
-## Go 类型映射
+## 多语言类型映射
 
-| Go 类型    | OpenAPI 3.1 类型                                 |
-| ---------- | ------------------------------------------------ |
-| `string`   | `type: string`                                   |
-| `int/int64` | `type: integer, format: int64`                  |
-| `uint32`   | `type: integer, format: int32, minimum: 0`       |
-| `float64`  | `type: number`                                   |
-| `bool`     | `type: boolean`                                  |
-| `time.Time` | `type: string, format: date-time`               |
-| `*T`       | `type: [T, 'null']`                              |
-| `[]T`      | `type: array, items: { type: T }`                |
+Skill 内置 Go、Java、PHP、Python 四种语言的类型映射表，覆盖常用数据类型：
+
+### Go
+
+| Go 类型     | OpenAPI 3.1 类型                                  |
+| ----------- | ------------------------------------------------- |
+| `string`    | `type: string`                                    |
+| `int/int64` | `type: integer, format: int64`                    |
+| `uint32`    | `type: integer, format: int32, minimum: 0`        |
+| `float64`   | `type: number`                                    |
+| `bool`      | `type: boolean`                                   |
+| `time.Time` | `type: string, format: date-time`                 |
+| `*T`        | `type: [T, 'null']`                               |
+| `[]T`       | `type: array, items: { type: T }`                 |
+
+### Java
+
+| Java 类型            | OpenAPI 3.1 类型                                   |
+| -------------------- | -------------------------------------------------- |
+| `String`             | `type: string`                                     |
+| `int/Integer`        | `type: integer, format: int32`                     |
+| `long/Long`          | `type: integer, format: int64`                     |
+| `double/Double`      | `type: number, format: double`                     |
+| `float/Float`        | `type: number, format: float`                      |
+| `BigDecimal`         | `type: number`                                     |
+| `boolean/Boolean`    | `type: boolean`                                    |
+| `LocalDate`          | `type: string, format: date`                       |
+| `LocalDateTime`      | `type: string, format: date-time`                  |
+| `UUID`               | `type: string, format: uuid`                       |
+| `List<T>`            | `type: array, items: { type: T }`                  |
+| `Map<String, T>`     | `type: object, additionalProperties: { type: T }`  |
+| `Optional<T>`        | `type: [T, 'null']`                                |
+| `@Nullable T`        | `type: [T, 'null']`                                |
+| `Enum`               | `type: string, enum: [...]`                        |
+
+### PHP
+
+| PHP 类型               | OpenAPI 3.1 类型                                   |
+| ---------------------- | -------------------------------------------------- |
+| `string`               | `type: string`                                     |
+| `int`                  | `type: integer, format: int64`                     |
+| `float`                | `type: number, format: double`                     |
+| `bool`                 | `type: boolean`                                    |
+| `array`                | `type: array, items: { type: T }`                  |
+| `DateTime/Carbon`      | `type: string, format: date-time`                  |
+| `?T`（可空类型）        | `type: [T, 'null']`                                |
+| `Collection`           | `type: array, items: { type: T }`                  |
+| `enum`（PHP 8.1+）     | `type: string, enum: [...]`                        |
+
+### Python
+
+| Python 类型              | OpenAPI 3.1 类型                                   |
+| ------------------------ | -------------------------------------------------- |
+| `str`                    | `type: string`                                     |
+| `int`                    | `type: integer, format: int64`                     |
+| `float`                  | `type: number, format: double`                     |
+| `bool`                   | `type: boolean`                                    |
+| `bytes`                  | `type: string, format: byte`                       |
+| `decimal.Decimal`        | `type: number`                                     |
+| `datetime.date`          | `type: string, format: date`                       |
+| `datetime.datetime`      | `type: string, format: date-time`                  |
+| `uuid.UUID`              | `type: string, format: uuid`                       |
+| `list[T]`                | `type: array, items: { type: T }`                  |
+| `dict[str, T]`           | `type: object, additionalProperties: { type: T }`  |
+| `Optional[T] / T \| None` | `type: [T, 'null']`                              |
+| `Literal["a", "b"]`      | `type: string, enum: ["a", "b"]`                   |
+| `Enum`                   | `type: string/integer, enum: [...]`                |
 
 ## 常见错误
 
