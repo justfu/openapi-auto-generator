@@ -1,13 +1,13 @@
 ---
 name: openapi-auto-generator
-description: Use when creating new API endpoints (Controller/Service), after implementation compiles successfully. Auto-generates OpenAPI 3.0 documentation. One file per API endpoint.
+description: Use when creating new API endpoints (Controller/Service), after implementation compiles successfully. Auto-generates OpenAPI 3.1 documentation. One file per API endpoint.
 ---
 
-# OpenAPI 3.0 文档自动生成（单接口模式）
+# OpenAPI 3.1 文档自动生成（单接口模式）
 
 ## Overview
 
-新接口开发完成后，自动生成符合 OpenAPI 3.0 标准的文档（YAML 格式），**每个接口单独生成一份文件**，确保 API 文档与代码同步。
+新接口开发完成后，自动生成符合 OpenAPI 3.1 标准的文档（YAML 格式），**每个接口单独生成一份文件**，确保 API 文档与代码同步。
 
 ## When to Use
 
@@ -37,11 +37,12 @@ description: Use when creating new API endpoints (Controller/Service), after imp
 
 | 项目 | 说明 |
 |------|------|
-| 文档格式 | OpenAPI 3.0 (YAML) |
+| 文档格式 | OpenAPI 3.1 (YAML) |
 | 存放目录 | `docs/openapi/` |
 | 文件命名 | `{operationId}.yaml` |
 | 必需字段 | summary, description, requestBody, responses (200/400/401/500) |
-| 响应示例 | 必须包含成功和失败场景 |
+| Security | 根级别定义，不需要鉴权的接口单独 `security: []` 覆盖 |
+| 可空字段 | 使用 `type: ['string', 'null']` 而非 `nullable: true` |
 
 ## 文档结构
 
@@ -53,241 +54,421 @@ description: Use when creating new API endpoints (Controller/Service), after imp
 - `docs/openapi/getUserProfile.yaml` - 获取用户信息接口
 - `docs/openapi/bindPhone.yaml` - 绑定手机号接口
 
-## 单接口文档模板
+## 文档格式规范
 
-### GET 接口示例
+### 结构顺序
 
 ```yaml
-openapi: 3.0.3
+openapi: '3.1.0'
 info:
-  title: 获取用户个人信息
+  version: '1.0.0'
+  title: '接口标题'
+  description: 接口描述
+security:              # 鉴权方案，放在根级别
+  - BearerAuth: []
+paths:
+  /api/v1/...:
+    parameters:         # 路径参数放在 path 级别，用 $ref 引用 components/schemas
+    get:
+      summary: ...
+      responses:
+components:
+  schemas:              # 所有数据模型
+  securitySchemes:      # 鉴权方案定义
+```
+
+### 关键规则
+
+1. **无 `servers` 段** - 不在文档中硬编码服务器地址
+2. **无 `tags` 段** - 不在文档中使用标签分组
+3. **Security 在根级别** - 需要鉴权的接口默认使用根级别 security；不需要鉴权的接口在 operation 中用 `security: []` 覆盖
+4. **路径参数提升到 path 级别** - 路径参数（in: path）放在 path 对象下，通过 `$ref` 引用 components/schemas 中的类型定义
+5. **无 `examples` 块** - 不在 schema 中添加 examples
+6. **无 `allOf` 合并** - 响应直接用 `$ref` 引用 schema，不使用 allOf 合并 StandardResponse
+7. **可空类型** - OpenAPI 3.1 中使用 `type: ['string', 'null']` 代替已废弃的 `nullable: true`
+8. **字符串值加引号** - `openapi: '3.1.0'`、`version: '1.0.0'` 等版本号字符串必须加引号
+
+## 单接口文档模板
+
+### GET 接口示例（带路径参数）
+
+```yaml
+openapi: '3.1.0'
+info:
+  version: '1.0.0'
+  title: '获取用户个人信息'
   description: 获取当前登录用户的基本信息、绑定状态以及自身的邀请码
-  version: 1.0.0
 
-servers:
-  - url: http://localhost:8000
-    description: 开发环境
-  - url: https://api.competition.com
-    description: 生产环境
-
-tags:
-  - name: 用户
-    description: 用户信息相关接口
+security:
+  - BearerAuth: []
 
 paths:
-  /api/v1/user/profile:
+  /api/v1/user/{userId}/profile:
+    parameters:
+      - name: userId
+        description: The unique identifier of the user
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UserId'
     get:
-      tags:
-        - 用户
       summary: 获取当前用户个人信息
       description: 获取当前登录用户的基本信息、绑定状态以及自身的邀请码。从JWT Token中解析用户ID，返回用户的完整档案信息。
-      operationId: getUserProfile
-      security:
-        - BearerAuth: []
       responses:
         '200':
           description: 获取成功
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/UserProfileData'
-              examples:
-                success:
-                  summary: 成功示例
-                  value:
-                    code: 200
-                    msg: "success"
-                    data:
-                      id: 10086
-                      area_code: 86
-                      openid: "oGZUI0egBJY1zhBYw2KhdUfwVJJE"
-                      phone: "13800138000"
-                      nickname: "张三"
-                      avatar: "https://..."
-                      gender: 1
+                $ref: '#/components/schemas/UserProfile'
         '401':
-          description: 未授权
+          description: 未授权，Token无效或过期
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                unauthorized:
-                  summary: Token无效或过期
-                  value:
-                    code: 401
-                    msg: "无效的Token"
-                    data: null
+                $ref: '#/components/schemas/Error'
         '500':
           description: 服务器错误
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
 
 components:
+  schemas:
+    UserId:
+      description: The unique identifier of a user
+      type: integer
+      format: int64
+
+    UserProfile:
+      description: 用户个人信息
+      type: object
+      required:
+        - id
+        - nickname
+      properties:
+        id:
+          $ref: '#/components/schemas/UserId'
+        area_code:
+          description: 手机国际区号
+          type: integer
+          format: int32
+          minimum: 0
+        openid:
+          description: 微信OpenID
+          type: string
+        phone:
+          description: 手机号
+          type:
+            - string
+            - 'null'
+        nickname:
+          description: 昵称
+          type: string
+        avatar:
+          description: 头像URL
+          type:
+            - string
+            - 'null'
+        gender:
+          description: 性别 1-男 2-女
+          type:
+            - integer
+            - 'null'
+
+    Error:
+      description: 错误响应
+      type: object
+      required:
+        - code
+        - msg
+      properties:
+        code:
+          description: 错误码
+          type: integer
+        msg:
+          description: 错误信息
+          type: string
+
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
       description: JWT Token鉴权，格式：Bearer {token}
+```
 
+### GET 接口示例（无路径参数）
+
+```yaml
+openapi: '3.1.0'
+info:
+  version: '1.0.0'
+  title: '获取用户个人信息'
+  description: 获取当前登录用户的基本信息、绑定状态以及自身的邀请码
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/v1/user/profile:
+    get:
+      summary: 获取当前用户个人信息
+      description: 获取当前登录用户的基本信息、绑定状态以及自身的邀请码。从JWT Token中解析用户ID，返回用户的完整档案信息。
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: 未授权，Token无效或过期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
   schemas:
-    StandardResponse:
+    UserProfile:
+      description: 用户个人信息
       type: object
-      required: [code, msg, data]
-      properties:
-        code:
-          type: integer
-          example: 200
-        msg:
-          type: string
-          example: "success"
-        data:
-          type: object
-          nullable: true
-
-    ErrorResponse:
-      type: object
-      required: [code, msg, data]
-      properties:
-        code:
-          type: integer
-          example: 400
-        msg:
-          type: string
-          example: "参数错误"
-        data:
-          type: object
-          nullable: true
-          example: null
-
-    UserProfileData:
-      type: object
+      required:
+        - id
+        - nickname
       properties:
         id:
+          description: 用户ID
           type: integer
           format: int64
-          example: 10086
-        area_code:
-          type: integer
-          format: int32
-          minimum: 0
-          example: 86
         nickname:
+          description: 昵称
           type: string
-          example: "张三"
+
+    Error:
+      description: 错误响应
+      type: object
+      required:
+        - code
+        - msg
+      properties:
+        code:
+          description: 错误码
+          type: integer
+        msg:
+          description: 错误信息
+          type: string
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Token鉴权，格式：Bearer {token}
 ```
 
 ### POST 接口示例
 
 ```yaml
-openapi: 3.0.3
+openapi: '3.1.0'
 info:
-  title: 绑定手机号
+  version: '1.0.0'
+  title: '绑定手机号'
   description: 接收小程序端获取的手机号授权code，由后端向微信服务器换取真实手机号并更新至用户表
-  version: 1.0.0
 
-servers:
-  - url: http://localhost:8000
-    description: 开发环境
-  - url: https://api.competition.com
-    description: 生产环境
-
-tags:
-  - name: 用户
-    description: 用户信息相关接口
+security:
+  - BearerAuth: []
 
 paths:
   /api/v1/user/bind-phone:
     post:
-      tags:
-        - 用户
       summary: 绑定手机号
-      description: 接收小程序端获取的手机号授权code，由后端向微信服务器换取真实手机号并更新至用户表。支持更改手机号，且需校验手机号是否已被其他用户绑定。同时保存微信返回的地区码。
-      operationId: bindPhone
-      security:
-        - BearerAuth: []
+      description: 接收小程序端获取的手机号授权code，由后端向微信服务器换取真实手机号并更新至用户表。支持更改手机号，且需校验手机号是否已被其他用户绑定。
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [phone_code]
-              properties:
-                phone_code:
-                  type: string
-                  description: 小程序<button open-type="getPhoneNumber">返回的动态code
-                  example: "071aBcDe23fGHi45678jKlMnO_pHxyz"
-            examples:
-              normal:
-                summary: 正常绑定
-                value:
-                  phone_code: "071aBcDe23fGHi45678jKlMnO_pHxyz"
+              $ref: '#/components/schemas/BindPhoneRequest'
       responses:
         '200':
           description: 绑定成功
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/BindPhoneData'
-              examples:
-                success:
-                  summary: 绑定成功
-                  value:
-                    code: 200
-                    msg: "绑定成功"
-                    data:
-                      phone: "13812341234"
+                $ref: '#/components/schemas/BindPhoneResponse'
+        '401':
+          description: 未授权，Token无效或过期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
+  schemas:
+    BindPhoneRequest:
+      description: 绑定手机号请求
+      type: object
+      required:
+        - phone_code
+      properties:
+        phone_code:
+          description: 小程序<button open-type="getPhoneNumber">返回的动态code
+          type: string
+
+    BindPhoneResponse:
+      description: 绑定手机号响应
+      type: object
+      required:
+        - phone
+      properties:
+        phone:
+          description: 绑定的手机号
+          type: string
+
+    Error:
+      description: 错误响应
+      type: object
+      required:
+        - code
+        - msg
+      properties:
+        code:
+          description: 错误码
+          type: integer
+        msg:
+          description: 错误信息
+          type: string
+
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: JWT Token鉴权，格式：Bearer {token}
+```
 
+### 无需鉴权接口示例
+
+```yaml
+openapi: '3.1.0'
+info:
+  version: '1.0.0'
+  title: '微信登录'
+  description: 通过微信小程序code获取或创建用户，返回JWT Token
+
+paths:
+  /api/v1/auth/wechat-login:
+    post:
+      summary: 微信登录
+      description: 通过微信小程序的登录code换取openid，查询或创建用户，返回JWT Token用于后续接口鉴权。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WechatLoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WechatLoginResponse'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
   schemas:
-    StandardResponse:
+    WechatLoginRequest:
+      description: 微信登录请求
       type: object
-      required: [code, msg, data]
+      required:
+        - code
       properties:
-        code: {type: integer, example: 200}
-        msg: {type: string, example: "success"}
-        data: {type: object, nullable: true}
-
-    BindPhoneData:
-      type: object
-      properties:
-        phone:
+        code:
+          description: 微信小程序wx.login()获取的临时登录凭证
           type: string
-          example: "13812341234"
+
+    WechatLoginResponse:
+      description: 微信登录响应
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          description: JWT Token，用于后续接口鉴权
+          type: string
+
+    Error:
+      description: 错误响应
+      type: object
+      required:
+        - code
+        - msg
+      properties:
+        code:
+          description: 错误码
+          type: integer
+        msg:
+          description: 错误信息
+          type: string
 ```
 
 ### 字段类型映射
 
-| Go 类型 | OpenAPI 类型 |
-|---------|--------------|
-| string | string |
-| int, int64 | integer, format: int64 |
-| uint32 | integer, format: int32, minimum: 0 |
-| float64 | number |
-| bool | boolean |
-| time.Time | string, format: date-time |
-| *T | type, nullable: true |
-| []T | array, items: type: T |
+| Go 类型 | OpenAPI 3.1 类型 |
+|---------|-------------------|
+| string | `type: string` |
+| int, int64 | `type: integer`, `format: int64` |
+| uint32 | `type: integer`, `format: int32`, `minimum: 0` |
+| float64 | `type: number` |
+| bool | `type: boolean` |
+| time.Time | `type: string`, `format: date-time` |
+| *T | `type: [T, 'null']` （数组类型表示可空） |
+| []T | `type: array`, `items: { type: T }` |
+
+### 可空类型说明（OpenAPI 3.1）
+
+OpenAPI 3.1 移除了 `nullable: true`，改用类型数组：
+
+```yaml
+# 旧写法（3.0）
+phone:
+  type: string
+  nullable: true
+
+# 新写法（3.1）
+phone:
+  type:
+    - string
+    - 'null'
+```
 
 ## Implementation Steps
 
@@ -303,11 +484,14 @@ components:
 
 3. **生成单接口文档**
    - 创建 `docs/openapi/{operationId}.yaml`
-   - 填充完整的 OpenAPI 规范（info, servers, tags, paths, components）
-   - 添加 examples 示例
+   - 按照格式规范填充：openapi, info, security, paths, components
+   - 路径参数放在 path 级别并用 `$ref` 引用 components/schemas
+   - 请求体和响应体也用 `$ref` 引用 components/schemas
+   - 可空字段使用 `type: [T, 'null']` 格式
 
 4. **验证文档**
    - 确保 YAML 格式正确
+   - 确保 schema 引用完整（所有 `$ref` 指向的 schema 都在 components/schemas 中定义）
    - 导入 Apifox 或其他工具测试
 
 ## 目录结构
@@ -325,15 +509,22 @@ docs/
 
 | 错误 | 正确做法 |
 |------|----------|
-| 缺少 401 响应 | 需要鉴权的接口必须有 401 响应 |
-| description 过于简单 | 必须描述接口功能和适用场景 |
-| 参数没有 example | 每个参数必须有示例值 |
-| *int64 没有标记 nullable | 指针类型必须加 nullable: true |
-| 单接口文档缺少 components | 每个文档都必须是完整的 OpenAPI 规范 |
+| 使用 `openapi: 3.0.3` | 必须使用 `openapi: '3.1.0'` |
+| 使用 `nullable: true` | 使用 `type: [T, 'null']` 数组格式 |
+| 使用 `servers` 段 | OpenAPI 3.1 文档不包含 servers |
+| 使用 `tags` 段 | OpenAPI 3.1 文档不包含 tags |
+| Security 放在 operation 级别 | 需要鉴权的接口使用根级别 security |
+| 路径参数放在 operation 内 | 路径参数必须放在 path 级别 |
+| 使用 `allOf` 合并响应 | 直接用 `$ref` 引用完整 schema |
+| 添加 `examples` 块 | 不添加 examples，保持简洁 |
+| 指针类型没有标记可空 | Go 的 `*T` 类型必须用 `type: [T, 'null']` |
+| 单接口文档缺少 components | 每个文档都必须包含完整的 components |
+| $ref 引用的 schema 未定义 | 所有引用的 schema 必须在 components/schemas 中定义 |
 
 ## Red Flags
 
 - 写完接口就直接提交，没有更新文档
-- 忘记添加 security: BearerAuth（需要鉴权的接口）
-- 响应示例数据结构与实际不一致
+- 需要鉴权的接口没有在根级别配置 security
+- 不需要鉴权的接口没有在 operation 中用 `security: []` 覆盖
+- 响应 schema 与实际代码中的响应结构不一致
 - 单接口文档中引用了不存在的 schema
