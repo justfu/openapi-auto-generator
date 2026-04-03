@@ -41,7 +41,7 @@ description: Use when creating new API endpoints (Controller/Service), after imp
 | 存放目录 | `docs/openapi/` |
 | 文件命名 | `{operationId}.yaml` |
 | 必需字段 | summary, description, requestBody, responses (200/400/401/500) |
-| Security | 根级别定义，不需要鉴权的接口单独 `security: []` 覆盖 |
+| Security | **根据实际代码检测**，生成对应的 securitySchemes |
 | 可空字段 | 使用 `type: ['string', 'null']` 而非 `nullable: true` |
 
 ## 文档结构
@@ -81,12 +81,89 @@ components:
 
 1. **无 `servers` 段** - 不在文档中硬编码服务器地址
 2. **无 `tags` 段** - 不在文档中使用标签分组
-3. **Security 在根级别** - 需要鉴权的接口默认使用根级别 security；不需要鉴权的接口在 operation 中用 `security: []` 覆盖
+3. **Security 根据实际代码确定** - 检查接口代码中的鉴权实现，根据实际方式生成对应的 securitySchemes
 4. **路径参数提升到 path 级别** - 路径参数（in: path）放在 path 对象下，通过 `$ref` 引用 components/schemas 中的类型定义
 5. **无 `examples` 块** - 不在 schema 中添加 examples
 6. **无 `allOf` 合并** - 响应直接用 `$ref` 引用 schema，不使用 allOf 合并 StandardResponse
 7. **可空类型** - OpenAPI 3.1 中使用 `type: ['string', 'null']` 代替已废弃的 `nullable: true`
 8. **字符串值加引号** - `openapi: '3.1.0'`、`version: '1.0.0'` 等版本号字符串必须加引号
+
+### 鉴权方式检测
+
+生成文档时，**必须检查接口代码中的实际鉴权实现**，根据代码确定 securitySchemes：
+
+#### 常见鉴权模式识别
+
+| 鉴权方式 | 代码特征 | OpenAPI securitySchemes |
+|----------|----------|-------------------------|
+| Header Token | `c.Header("token")`、`c.GetHeader("token")`、`x-token` | `type: apiKey, in: header, name: token` |
+| Bearer JWT | `Authorization: Bearer`、`jwt.Parse`、`Bearer ` | `type: http, scheme: bearer` |
+| API Key Query | `c.Query("api_key")`、`?api_key=` | `type: apiKey, in: query, name: api_key` |
+| Cookie | `c.Cookie("session")`、`http.Cookie` | `type: apiKey, in: cookie, name: session` |
+| OAuth2 | `oauth2`、`Bearer token` + refresh | `type: oauth2, flows: {...}` |
+| Basic Auth | `Authorization: Basic`、base64 编码 | `type: http, scheme: basic` |
+| 无鉴权 | 公开接口、无中间件、`security: []` | 不需要 securitySchemes |
+
+#### 检测步骤
+
+1. **检查中间件** - 查看路由是否挂载了鉴权中间件（如 `AuthMiddleware`、`JWTMiddleware`）
+2. **检查 Handler 代码** - 查看是否从 `c.Header()`、`c.Cookie()` 等获取凭证
+3. **检查项目鉴权配置** - 查看项目中是否有统一的鉴权配置文件
+4. **确定鉴权方案名称** - 根据检测到的鉴权方式，使用合适的名称（如 `TokenAuth`、`BearerAuth`、`ApiKeyAuth`）
+
+#### 常见框架鉴权代码特征
+
+**Go (Gin/Echo):**
+```go
+// Header Token
+token := c.GetHeader("token")
+token := c.Header("token")
+
+// Bearer JWT
+auth := c.GetHeader("Authorization")
+if strings.HasPrefix(auth, "Bearer ") { ... }
+
+// Query API Key
+apiKey := c.Query("api_key")
+
+// Cookie
+token, err := c.Cookie("session_token")
+```
+
+**Java (Spring):**
+```java
+// Header Token
+@RequestHeader("token") String token
+request.getHeader("token");
+
+// Bearer JWT
+@RequestHeader("Authorization") String auth
+BearerTokenAuthentication
+
+// SecurityContext
+SecurityContextHolder.getContext().getAuthentication()
+```
+
+**PHP (Laravel):**
+```php
+// Header Token
+$request->header('token');
+$request->bearerToken(); // Bearer
+
+// Sanctum/Passport
+auth('sanctum')->user();
+```
+
+**Python (FastAPI/Flask):**
+```python
+# Header Token
+token = request.headers.get("token")
+token = Header(alias="token")
+
+# Bearer JWT
+from fastapi.security import HTTPBearer
+HTTPBearer()
+```
 
 ## 单接口文档模板
 
@@ -555,20 +632,35 @@ phone:
    - 确认请求参数（Query/Path/Body）
    - 确认是否需要鉴权
 
-2. **提取请求/响应模型**
+2. **检测实际鉴权实现**
+   - **检查中间件配置** - 查看路由是否挂载了鉴权中间件（如 `AuthMiddleware`、`JWTMiddleware`）
+   - **检查 Handler 代码** - 查看是否从 `c.Header()`、`c.Cookie()`、`c.Query()` 获取凭证
+   - **检查项目鉴权配置** - 查看项目中是否有统一的鉴权配置文件或常量定义
+   - **确定 securitySchemes** - 根据检测到的鉴权方式，生成对应的 OpenAPI securitySchemes：
+     - Header Token: `type: apiKey, in: header, name: token`
+     - Bearer JWT: `type: http, scheme: bearer`
+     - API Key Query: `type: apiKey, in: query, name: api_key`
+     - Cookie: `type: apiKey, in: cookie, name: session`
+     - OAuth2: `type: oauth2, flows: {...}`
+     - Basic Auth: `type: http, scheme: basic`
+     - 无鉴权: `security: []`
+
+3. **提取请求/响应模型**
    - 读取 requestModel 中的请求体结构
    - 读取 responseModel 中的响应体结构
 
-3. **生成单接口文档**
+4. **生成单接口文档**
    - 创建 `docs/openapi/{operationId}.yaml`
    - 按照格式规范填充：openapi, info, security, paths, components
+   - **根据步骤 2 检测结果** 生成正确的 security 和 securitySchemes
    - 路径参数放在 path 级别并用 `$ref` 引用 components/schemas
    - 请求体和响应体也用 `$ref` 引用 components/schemas
    - 可空字段使用 `type: [T, 'null']` 格式
 
-4. **验证文档**
+5. **验证文档**
    - 确保 YAML 格式正确
    - 确保 schema 引用完整（所有 `$ref` 指向的 schema 都在 components/schemas 中定义）
+   - 确保 securitySchemes 与实际代码鉴权方式一致
    - 导入 Apifox 或其他工具测试
 
 ## 目录结构
@@ -590,6 +682,8 @@ docs/
 | 使用 `nullable: true` | 使用 `type: [T, 'null']` 数组格式 |
 | 使用 `servers` 段 | OpenAPI 3.1 文档不包含 servers |
 | 使用 `tags` 段 | OpenAPI 3.1 文档不包含 tags |
+| **直接套用固定鉴权模板** | **必须检查代码中实际的鉴权实现，生成对应的 securitySchemes** |
+| **securitySchemes 与代码不符** | **检测代码中的 Header/Cookie/Query/Bearer 等实际鉴权方式** |
 | Security 放在 operation 级别 | 需要鉴权的接口使用根级别 security |
 | 路径参数放在 operation 内 | 路径参数必须放在 path 级别 |
 | 使用 `allOf` 合并响应 | 直接用 `$ref` 引用完整 schema |
@@ -601,6 +695,8 @@ docs/
 ## Red Flags
 
 - 写完接口就直接提交，没有更新文档
+- **没有检查实际代码的鉴权实现**，直接套用固定的 securitySchemes
+- **securitySchemes 与代码实际鉴权方式不符**（如代码用 Header Token 却写成 Bearer JWT）
 - 需要鉴权的接口没有在根级别配置 security
 - 不需要鉴权的接口没有在 operation 中用 `security: []` 覆盖
 - 响应 schema 与实际代码中的响应结构不一致

@@ -108,9 +108,30 @@ paths:
 
 ### 鉴权方式
 
-所有需要鉴权的接口使用 Header 直接传递 `token` 参数：
+**Skill 会自动检测接口代码中的实际鉴权实现**，生成对应的 securitySchemes，而不是套用固定模板。
+
+#### 检测逻辑
+
+1. 检查中间件配置 - 路由是否挂载鉴权中间件
+2. 检查 Handler 代码 - 是否从 Header/Cookie/Query 获取凭证
+3. 检查项目配置 - 统一的鉴权配置文件或常量
+4. 根据检测结果生成对应的 securitySchemes
+
+#### 支持的鉴权模式
+
+| 模式 | 代码特征 | securitySchemes |
+|------|----------|-----------------|
+| Header Token | `c.Header("token")`、`c.GetHeader("token")` | `type: apiKey, in: header, name: token` |
+| Bearer JWT | `Authorization: Bearer`、`jwt.Parse` | `type: http, scheme: bearer` |
+| API Key Query | `c.Query("api_key")` | `type: apiKey, in: query, name: api_key` |
+| Cookie | `c.Cookie("session")` | `type: apiKey, in: cookie, name: session` |
+| Basic Auth | `Authorization: Basic` | `type: http, scheme: basic` |
+| 无鉴权 | 公开接口 | `security: []` |
+
+#### 示例
 
 ```yaml
+# 检测到代码使用 c.GetHeader("token") 时的 securitySchemes
 security:
   - TokenAuth: []
 
