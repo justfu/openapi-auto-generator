@@ -632,18 +632,40 @@ phone:
    - 确认请求参数（Query/Path/Body）
    - 确认是否需要鉴权
 
-2. **检测实际鉴权实现**
-   - **检查中间件配置** - 查看路由是否挂载了鉴权中间件（如 `AuthMiddleware`、`JWTMiddleware`）
-   - **检查 Handler 代码** - 查看是否从 `c.Header()`、`c.Cookie()`、`c.Query()` 获取凭证
-   - **检查项目鉴权配置** - 查看项目中是否有统一的鉴权配置文件或常量定义
-   - **确定 securitySchemes** - 根据检测到的鉴权方式，生成对应的 OpenAPI securitySchemes：
-     - Header Token: `type: apiKey, in: header, name: token`
-     - Bearer JWT: `type: http, scheme: bearer`
-     - API Key Query: `type: apiKey, in: query, name: api_key`
-     - Cookie: `type: apiKey, in: cookie, name: session`
-     - OAuth2: `type: oauth2, flows: {...}`
-     - Basic Auth: `type: http, scheme: basic`
-     - 无鉴权: `security: []`
+2. **检测实际鉴权实现（必须执行代码扫描）**
+
+   > **这一步不是描述，而是必须执行的动作。** 使用 Grep/Glob/Read 工具扫描项目代码。
+
+   **Step 2a - 扫描中间件文件：**
+   - 用 Glob 搜索 `**/middleware/**`、`**/auth*`、`**/jwt*` 等文件
+   - 用 Grep 搜索关键词：`Auth`、`Token`、`JWT`、`Authorization`、`Bearer`
+   - 读取匹配的中间件文件，确认鉴权逻辑
+
+   **Step 2b - 扫描路由注册：**
+   - 用 Glob 搜索 `**/router*`、`**/route*`、`**/routes*` 文件
+   - 读取路由文件，查看哪些路由组挂载了鉴权中间件
+   - 确认当前接口是否在鉴权路由组内
+
+   **Step 2c - 扫描 Controller/Handler：**
+   - 读取当前接口的 Controller/Handler 代码
+   - 检查是否从 Header/Cookie/Query 获取凭证
+   - 确认凭证的 key 名称（如 `token`、`Authorization`、`api_key`）
+
+   **Step 2d - 根据扫描结果确定 securitySchemes：**
+
+   | 扫描到的代码特征 | 生成的 securitySchemes |
+   |------------------|------------------------|
+   | `c.GetHeader("token")` / `c.Header("token")` / `x-token` | `TokenAuth: { type: apiKey, in: header, name: token }` |
+   | `c.GetHeader("Authorization")` + `Bearer ` | `BearerAuth: { type: http, scheme: bearer }` |
+   | `c.Query("api_key")` / `?api_key=` | `ApiKeyAuth: { type: apiKey, in: query, name: api_key }` |
+   | `c.Cookie("session")` / `http.Cookie` | `CookieAuth: { type: apiKey, in: cookie, name: session }` |
+   | `Authorization: Basic` / base64 | `BasicAuth: { type: http, scheme: basic }` |
+   | 路由未挂载鉴权中间件 | `security: []`（不生成 securitySchemes） |
+
+   **判断是否需要鉴权：**
+   - 路由在鉴权中间件组内 → 根级别 `security: [{方案名}: []]`
+   - 路由不在鉴权中间件组内 → operation 级别 `security: []`
+   - 不确定 → 提示用户确认
 
 3. **提取请求/响应模型**
    - 读取 requestModel 中的请求体结构
